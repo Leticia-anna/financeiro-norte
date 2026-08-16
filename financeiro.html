@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financeiro — Meu Norte Financeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">
+    <svg viewBox="0 0 100 100" fill="none">
+      <circle cx="50" cy="50" r="47" stroke="#FAF7F1" stroke-width="4" opacity="0.5"/>
+      <path d="M50 14 L61 50 L50 86 L39 50 Z" fill="#D9B564"/>
+    </svg>
+    Meu Norte Financeiro
+  </div>
+  <div class="app-header-right">
+    <span id="user-email"></span>
+    <button class="logout-btn" onclick="fazerLogout()">Sair</button>
+  </div>
+</header>
+
+<nav class="tab-bar">
+  <a href="visao-geral.html" class="tab-item">Visão geral</a>
+  <a href="financeiro.html" class="tab-item active">Financeiro</a>
+  <a href="metas.html" class="tab-item">Metas</a>
+  <a href="investimentos.html" class="tab-item">Investimentos</a>
+  <a href="dashboard.html" class="tab-item">Clientes</a>
+  <a href="relatorios.html" class="tab-item">Relatórios</a>
+  <a href="admin.html" class="tab-item">Admin</a>
+</nav>
+
+<main class="app-main">
+  <div class="section-title-row">
+    <h1>Financeiro</h1>
+  </div>
+  <p style="margin-top:-10px;">Comparação entre receitas e despesas mensais de cada cliente.</p>
+
+  <div class="stats-row" id="stats-row" style="display:none;">
+    <div class="stat-card">
+      <div class="label">Receitas totais (mês)</div>
+      <div class="value positive" id="stat-receitas">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Despesas totais (mês)</div>
+      <div class="value negative" id="stat-despesas">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Resultado líquido</div>
+      <div class="value" id="stat-resultado">—</div>
+    </div>
+  </div>
+
+  <div id="loading" class="loading-state">Carregando dados financeiros...</div>
+  <div id="empty" class="empty-state" style="display:none;"></div>
+
+  <div class="card" id="chart-card" style="display:none;">
+    <h3>Receitas x Despesas por cliente</h3>
+    <div class="fin-legend">
+      <span><span class="swatch receita"></span>Receitas</span>
+      <span><span class="swatch despesa"></span>Despesas</span>
+    </div>
+    <div id="fin-rows"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/authGuard.js"></script>
+<script>
+  function formatBRL(v) {
+    return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  async function carregar() {
+    const { data: session } = await supabaseClient.auth.getSession();
+    if (session.session) document.getElementById('user-email').textContent = session.session.user.email;
+
+    const { data: clientes, error } = await supabaseClient.from('clientes').select('*').order('receitas_mes', { ascending: false });
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (error) {
+      document.getElementById('empty').textContent = 'Erro ao carregar dados: ' + error.message;
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+    if (!clientes || clientes.length === 0) {
+      document.getElementById('empty').textContent = 'Nenhum cliente cadastrado ainda.';
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+
+    const totalReceitas = clientes.reduce((s, c) => s + Number(c.receitas_mes || 0), 0);
+    const totalDespesas = clientes.reduce((s, c) => s + Number(c.despesas_mes || 0), 0);
+    document.getElementById('stat-receitas').textContent = formatBRL(totalReceitas);
+    document.getElementById('stat-despesas').textContent = formatBRL(totalDespesas);
+    document.getElementById('stat-resultado').textContent = formatBRL(totalReceitas - totalDespesas);
+    document.getElementById('stat-resultado').className = 'value ' + (totalReceitas - totalDespesas >= 0 ? 'positive' : 'negative');
+    document.getElementById('stats-row').style.display = 'grid';
+
+    const maxValor = Math.max(...clientes.map(c => Math.max(Number(c.receitas_mes || 0), Number(c.despesas_mes || 0))), 1);
+
+    document.getElementById('fin-rows').innerHTML = clientes.map(c => {
+      const receitaPct = Math.round((Number(c.receitas_mes || 0) / maxValor) * 100);
+      const despesaPct = Math.round((Number(c.despesas_mes || 0) / maxValor) * 100);
+      return `
+        <div class="fin-row">
+          <div class="fin-head"><span>${c.nome}</span></div>
+          <div class="fin-bar-track"><div class="fin-bar-seg receita" style="width:${receitaPct}%"></div></div>
+          <div class="fin-bar-track" style="margin-top:4px;"><div class="fin-bar-seg despesa" style="width:${despesaPct}%"></div></div>
+          <div class="fin-values"><span>Receitas: ${formatBRL(c.receitas_mes)}</span><span>Despesas: ${formatBRL(c.despesas_mes)}</span></div>
+        </div>
+      `;
+    }).join('');
+    document.getElementById('chart-card').style.display = 'block';
+  }
+
+  carregar();
+</script>
+</body>
+</html>
