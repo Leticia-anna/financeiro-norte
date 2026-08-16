@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalhe do cliente — Meu Norte Financeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">
+    <svg viewBox="0 0 100 100" fill="none">
+      <circle cx="50" cy="50" r="47" stroke="#FAF7F1" stroke-width="4" opacity="0.5"/>
+      <path d="M50 14 L61 50 L50 86 L39 50 Z" fill="#D9B564"/>
+    </svg>
+    Meu Norte Financeiro
+  </div>
+  <div class="app-header-right">
+    <span id="user-email"></span>
+    <button class="logout-btn" onclick="fazerLogout()">Sair</button>
+  </div>
+</header>
+
+<nav class="tab-bar">
+  <span class="tab-item disabled" title="Em breve">Visão geral</span>
+  <span class="tab-item disabled" title="Em breve">Financeiro</span>
+  <span class="tab-item disabled" title="Em breve">Metas</span>
+  <span class="tab-item disabled" title="Em breve">Investimentos</span>
+  <a href="dashboard.html" class="tab-item active">Clientes</a>
+  <span class="tab-item disabled" title="Em breve">Relatórios</span>
+  <a href="admin.html" class="tab-item">Admin</a>
+</nav>
+
+<main class="app-main">
+  <a href="dashboard.html" class="back-link">← Voltar para clientes</a>
+
+  <div id="loading" class="loading-state">Carregando dados do cliente...</div>
+  <div id="content" style="display:none;">
+
+    <div class="section-title-row">
+      <h1 id="cliente-nome">—</h1>
+    </div>
+    <p id="cliente-email" style="margin-top:-14px;"></p>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label">Saldo atual</div>
+        <div class="value" id="cliente-saldo">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Receitas do mês</div>
+        <div class="value positive" id="cliente-receitas">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Despesas do mês</div>
+        <div class="value negative" id="cliente-despesas">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Metas financeiras</h3>
+      <div id="goals-list"></div>
+      <div id="no-goals" class="empty-state" style="display:none; padding: 24px 0;">Nenhuma meta cadastrada para este cliente ainda.</div>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/authGuard.js"></script>
+<script>
+  function formatBRL(v) {
+    return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const clienteId = params.get('id');
+
+  async function carregarCliente() {
+    const { data: session } = await supabaseClient.auth.getSession();
+    if (session.session) {
+      document.getElementById('user-email').textContent = session.session.user.email;
+    }
+
+    if (!clienteId) {
+      document.getElementById('loading').textContent = 'Cliente não encontrado.';
+      return;
+    }
+
+    const [{ data: cliente, error: erroCliente }, { data: metas, error: erroMetas }] = await Promise.all([
+      supabaseClient.from('clientes').select('*').eq('id', clienteId).single(),
+      supabaseClient.from('metas').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: true })
+    ]);
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (erroCliente || !cliente) {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('loading').textContent = 'Não foi possível carregar este cliente.';
+      return;
+    }
+
+    document.getElementById('content').style.display = 'block';
+    document.getElementById('cliente-nome').textContent = cliente.nome;
+    document.getElementById('cliente-email').textContent = cliente.email || '';
+    document.getElementById('cliente-saldo').textContent = formatBRL(cliente.saldo_atual);
+    document.getElementById('cliente-receitas').textContent = formatBRL(cliente.receitas_mes);
+    document.getElementById('cliente-despesas').textContent = formatBRL(cliente.despesas_mes);
+
+    if (!erroMetas && metas && metas.length > 0) {
+      document.getElementById('goals-list').innerHTML = metas.map(m => {
+        const pct = Math.min(100, Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100));
+        return `
+          <div class="goal-item">
+            <div class="goal-head">
+              <span class="name">${m.nome}</span>
+              <span class="pct">${pct}%</span>
+            </div>
+            <div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
+            <div class="goal-values">${formatBRL(m.valor_atual)} de ${formatBRL(m.valor_alvo)}</div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      document.getElementById('no-goals').style.display = 'block';
+    }
+  }
+
+  carregarCliente();
+</script>
+</body>
+</html>
