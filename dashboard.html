@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clientes — Meu Norte Financeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">
+    <svg viewBox="0 0 100 100" fill="none">
+      <circle cx="50" cy="50" r="47" stroke="#FAF7F1" stroke-width="4" opacity="0.5"/>
+      <path d="M50 14 L61 50 L50 86 L39 50 Z" fill="#D9B564"/>
+    </svg>
+    Meu Norte Financeiro
+  </div>
+  <div class="app-header-right">
+    <span id="user-email"></span>
+    <button class="logout-btn" onclick="fazerLogout()">Sair</button>
+  </div>
+</header>
+
+<nav class="tab-bar">
+  <span class="tab-item disabled" title="Em breve">Visão geral</span>
+  <span class="tab-item disabled" title="Em breve">Financeiro</span>
+  <span class="tab-item disabled" title="Em breve">Metas</span>
+  <span class="tab-item disabled" title="Em breve">Investimentos</span>
+  <a href="dashboard.html" class="tab-item active">Clientes</a>
+  <span class="tab-item disabled" title="Em breve">Relatórios</span>
+  <a href="admin.html" class="tab-item">Admin</a>
+</nav>
+
+<main class="app-main">
+  <div class="section-title-row">
+    <h1>Clientes</h1>
+  </div>
+
+  <div class="stats-row" id="stats-row" style="display:none;">
+    <div class="stat-card">
+      <div class="label">Clientes ativos</div>
+      <div class="value" id="stat-total">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Saldo total sob gestão</div>
+      <div class="value positive" id="stat-saldo">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Despesas do mês (soma)</div>
+      <div class="value" id="stat-despesas">—</div>
+    </div>
+  </div>
+
+  <div id="loading" class="loading-state">Carregando clientes...</div>
+  <div id="empty" class="empty-state" style="display:none;">Nenhum cliente cadastrado ainda.</div>
+  <div class="client-grid" id="client-grid"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/authGuard.js"></script>
+<script>
+  function formatBRL(v) {
+    return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+  function initials(name) {
+    return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+  }
+
+  async function carregarClientes() {
+    const { data: session } = await supabaseClient.auth.getSession();
+    if (session.session) {
+      document.getElementById('user-email').textContent = session.session.user.email;
+    }
+
+    const { data: clientes, error } = await supabaseClient
+      .from('clientes')
+      .select('*')
+      .order('nome', { ascending: true });
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (error) {
+      document.getElementById('empty').textContent = 'Erro ao carregar clientes: ' + error.message;
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+
+    if (!clientes || clientes.length === 0) {
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+
+    // Stats
+    const totalSaldo = clientes.reduce((s, c) => s + Number(c.saldo_atual || 0), 0);
+    const totalDespesas = clientes.reduce((s, c) => s + Number(c.despesas_mes || 0), 0);
+    document.getElementById('stat-total').textContent = clientes.length;
+    document.getElementById('stat-saldo').textContent = formatBRL(totalSaldo);
+    document.getElementById('stat-despesas').textContent = formatBRL(totalDespesas);
+    document.getElementById('stats-row').style.display = 'grid';
+
+    const grid = document.getElementById('client-grid');
+    grid.innerHTML = clientes.map(c => `
+      <a href="cliente.html?id=${c.id}" class="client-card">
+        <div class="client-avatar">${initials(c.nome)}</div>
+        <h3>${c.nome}</h3>
+        <div class="email">${c.email || 'sem e-mail cadastrado'}</div>
+        <div class="row"><span class="label">Saldo atual</span><span class="value">${formatBRL(c.saldo_atual)}</span></div>
+        <div class="row"><span class="label">Receitas do mês</span><span class="value">${formatBRL(c.receitas_mes)}</span></div>
+        <div class="row"><span class="label">Despesas do mês</span><span class="value negative">${formatBRL(c.despesas_mes)}</span></div>
+      </a>
+    `).join('');
+  }
+
+  carregarClientes();
+</script>
+</body>
+</html>
