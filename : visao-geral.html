@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visão geral — Meu Norte Financeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">
+    <svg viewBox="0 0 100 100" fill="none">
+      <circle cx="50" cy="50" r="47" stroke="#FAF7F1" stroke-width="4" opacity="0.5"/>
+      <path d="M50 14 L61 50 L50 86 L39 50 Z" fill="#D9B564"/>
+    </svg>
+    Meu Norte Financeiro
+  </div>
+  <div class="app-header-right">
+    <span id="user-email"></span>
+    <button class="logout-btn" onclick="fazerLogout()">Sair</button>
+  </div>
+</header>
+
+<nav class="tab-bar">
+  <a href="visao-geral.html" class="tab-item active">Visão geral</a>
+  <a href="financeiro.html" class="tab-item">Financeiro</a>
+  <a href="metas.html" class="tab-item">Metas</a>
+  <a href="investimentos.html" class="tab-item">Investimentos</a>
+  <a href="dashboard.html" class="tab-item">Clientes</a>
+  <a href="relatorios.html" class="tab-item">Relatórios</a>
+  <a href="admin.html" class="tab-item">Admin</a>
+</nav>
+
+<main class="app-main">
+  <div class="section-title-row">
+    <h1>Visão geral</h1>
+  </div>
+
+  <div class="stats-row" id="stats-row" style="display:none;">
+    <div class="stat-card">
+      <div class="label">Clientes ativos</div>
+      <div class="value" id="stat-total">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Saldo total sob gestão</div>
+      <div class="value positive" id="stat-saldo">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Resultado do mês (receitas − despesas)</div>
+      <div class="value" id="stat-resultado">—</div>
+    </div>
+  </div>
+
+  <div class="stats-row" id="stats-row-2" style="display:none;">
+    <div class="stat-card">
+      <div class="label">Metas em andamento</div>
+      <div class="value" id="stat-metas-total">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Progresso médio das metas</div>
+      <div class="value positive" id="stat-metas-media">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total investido</div>
+      <div class="value" id="stat-investido">—</div>
+    </div>
+  </div>
+
+  <div id="loading" class="loading-state">Carregando visão geral...</div>
+  <div id="empty" class="empty-state" style="display:none;"></div>
+
+  <div class="card" id="ranking-card" style="display:none;">
+    <h3>Clientes por saldo atual</h3>
+    <div id="ranking-list"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/authGuard.js"></script>
+<script>
+  function formatBRL(v) {
+    return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  async function carregar() {
+    const { data: session } = await supabaseClient.auth.getSession();
+    if (session.session) document.getElementById('user-email').textContent = session.session.user.email;
+
+    const [{ data: clientes, error: e1 }, { data: metas, error: e2 }, { data: investimentos, error: e3 }] = await Promise.all([
+      supabaseClient.from('clientes').select('*'),
+      supabaseClient.from('metas').select('*'),
+      supabaseClient.from('investimentos').select('*')
+    ]);
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (e1) {
+      document.getElementById('empty').textContent = 'Erro ao carregar dados: ' + e1.message;
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+
+    if (!clientes || clientes.length === 0) {
+      document.getElementById('empty').textContent = 'Nenhum cliente cadastrado ainda.';
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+
+    const totalSaldo = clientes.reduce((s, c) => s + Number(c.saldo_atual || 0), 0);
+    const totalReceitas = clientes.reduce((s, c) => s + Number(c.receitas_mes || 0), 0);
+    const totalDespesas = clientes.reduce((s, c) => s + Number(c.despesas_mes || 0), 0);
+    const resultado = totalReceitas - totalDespesas;
+
+    document.getElementById('stat-total').textContent = clientes.length;
+    document.getElementById('stat-saldo').textContent = formatBRL(totalSaldo);
+    document.getElementById('stat-resultado').textContent = formatBRL(resultado);
+    document.getElementById('stat-resultado').className = 'value ' + (resultado >= 0 ? 'positive' : 'negative');
+    document.getElementById('stats-row').style.display = 'grid';
+
+    const metasList = metas && !e2 ? metas : [];
+    const mediaPct = metasList.length
+      ? Math.round(metasList.reduce((s, m) => s + Math.min(100, (Number(m.valor_atual) / Number(m.valor_alvo)) * 100), 0) / metasList.length)
+      : 0;
+    document.getElementById('stat-metas-total').textContent = metasList.length;
+    document.getElementById('stat-metas-media').textContent = mediaPct + '%';
+
+    const investList = investimentos && !e3 ? investimentos : [];
+    const totalInvestido = investList.reduce((s, i) => s + Number(i.valor_aplicado || 0), 0);
+    document.getElementById('stat-investido').textContent = formatBRL(totalInvestido);
+    document.getElementById('stats-row-2').style.display = 'grid';
+
+    const maxSaldo = Math.max(...clientes.map(c => Number(c.saldo_atual || 0)), 1);
+    const ordenados = [...clientes].sort((a, b) => Number(b.saldo_atual || 0) - Number(a.saldo_atual || 0));
+    document.getElementById('ranking-list').innerHTML = ordenados.map(c => {
+      const pct = Math.max(4, Math.round((Number(c.saldo_atual || 0) / maxSaldo) * 100));
+      return `
+        <div class="rank-row">
+          <div class="name">${c.nome}</div>
+          <div class="rank-track"><div class="rank-fill" style="width:${pct}%"></div></div>
+          <div class="amount">${formatBRL(c.saldo_atual)}</div>
+        </div>
+      `;
+    }).join('');
+    document.getElementById('ranking-card').style.display = 'block';
+  }
+
+  carregar();
+</script>
+</body>
+</html>
