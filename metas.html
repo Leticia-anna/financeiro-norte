@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Metas — Meu Norte Financeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">
+    <svg viewBox="0 0 100 100" fill="none">
+      <circle cx="50" cy="50" r="47" stroke="#FAF7F1" stroke-width="4" opacity="0.5"/>
+      <path d="M50 14 L61 50 L50 86 L39 50 Z" fill="#D9B564"/>
+    </svg>
+    Meu Norte Financeiro
+  </div>
+  <div class="app-header-right">
+    <span id="user-email"></span>
+    <button class="logout-btn" onclick="fazerLogout()">Sair</button>
+  </div>
+</header>
+
+<nav class="tab-bar">
+  <a href="visao-geral.html" class="tab-item">Visão geral</a>
+  <a href="financeiro.html" class="tab-item">Financeiro</a>
+  <a href="metas.html" class="tab-item active">Metas</a>
+  <a href="investimentos.html" class="tab-item">Investimentos</a>
+  <a href="dashboard.html" class="tab-item">Clientes</a>
+  <a href="relatorios.html" class="tab-item">Relatórios</a>
+  <a href="admin.html" class="tab-item">Admin</a>
+</nav>
+
+<main class="app-main">
+  <div class="section-title-row">
+    <h1>Metas</h1>
+  </div>
+  <p style="margin-top:-10px;">Todas as metas financeiras de todos os clientes, ordenadas das que precisam de mais atenção para as mais avançadas.</p>
+
+  <div id="loading" class="loading-state">Carregando metas...</div>
+  <div id="empty" class="empty-state" style="display:none;"></div>
+
+  <div class="card" id="table-card" style="display:none;">
+    <table class="simple-table">
+      <thead>
+        <tr><th>Cliente</th><th>Meta</th><th>Progresso</th><th>Valores</th></tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/authGuard.js"></script>
+<script>
+  function formatBRL(v) {
+    return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  async function carregar() {
+    const { data: session } = await supabaseClient.auth.getSession();
+    if (session.session) document.getElementById('user-email').textContent = session.session.user.email;
+
+    const [{ data: metas, error: e1 }, { data: clientes, error: e2 }] = await Promise.all([
+      supabaseClient.from('metas').select('*'),
+      supabaseClient.from('clientes').select('id, nome')
+    ]);
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (e1 || e2) {
+      document.getElementById('empty').textContent = 'Erro ao carregar metas.';
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+    if (!metas || metas.length === 0) {
+      document.getElementById('empty').textContent = 'Nenhuma meta cadastrada ainda.';
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+
+    const nomeCliente = Object.fromEntries((clientes || []).map(c => [c.id, c.nome]));
+
+    const comPct = metas.map(m => ({
+      ...m,
+      pct: Math.min(100, Math.round((Number(m.valor_atual) / Number(m.valor_alvo)) * 100))
+    })).sort((a, b) => a.pct - b.pct);
+
+    document.getElementById('table-body').innerHTML = comPct.map(m => `
+      <tr>
+        <td>${nomeCliente[m.cliente_id] || '—'}</td>
+        <td>${m.nome}</td>
+        <td><span class="mini-bar-track"><span class="mini-bar-fill" style="width:${m.pct}%"></span></span>${m.pct}%</td>
+        <td class="muted">${formatBRL(m.valor_atual)} de ${formatBRL(m.valor_alvo)}</td>
+      </tr>
+    `).join('');
+    document.getElementById('table-card').style.display = 'block';
+  }
+
+  carregar();
+</script>
+</body>
+</html>
