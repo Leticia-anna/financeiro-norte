@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Meu Norte Financeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">
+    <svg viewBox="0 0 100 100" fill="none">
+      <circle cx="50" cy="50" r="47" stroke="#FAF7F1" stroke-width="4" opacity="0.5"/>
+      <path d="M50 14 L61 50 L50 86 L39 50 Z" fill="#D9B564"/>
+    </svg>
+    Meu Norte Financeiro
+  </div>
+  <div class="app-header-right">
+    <span id="user-email"></span>
+    <button class="logout-btn" onclick="fazerLogout()">Sair</button>
+  </div>
+</header>
+
+<nav class="tab-bar">
+  <span class="tab-item disabled" title="Em breve">Visão geral</span>
+  <span class="tab-item disabled" title="Em breve">Financeiro</span>
+  <span class="tab-item disabled" title="Em breve">Metas</span>
+  <span class="tab-item disabled" title="Em breve">Investimentos</span>
+  <a href="dashboard.html" class="tab-item">Clientes</a>
+  <span class="tab-item disabled" title="Em breve">Relatórios</span>
+  <a href="admin.html" class="tab-item active">Admin</a>
+</nav>
+
+<main class="app-main">
+  <div class="section-title-row">
+    <h1>Admin</h1>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="label">Sua conta</div>
+      <div class="value" style="font-size:16px;" id="admin-email">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Clientes cadastrados</div>
+      <div class="value" id="admin-total-clientes">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Conta criada em</div>
+      <div class="value" style="font-size:16px;" id="admin-criado-em">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Adicionar outro assessor à equipe</h3>
+    <p>Por segurança, novos acessos ainda são criados diretamente no painel do Supabase (não existe cadastro público neste app). Para adicionar um colega:</p>
+    <p>1. Acesse o painel do Supabase deste projeto → <strong>Authentication</strong> → <strong>Users</strong> → <strong>Add user</strong>.<br>
+    2. Preencha o e-mail e uma senha temporária para a pessoa.<br>
+    3. Um perfil de assessor é criado automaticamente para ela assim que o primeiro login for feito.</p>
+  </div>
+
+  <div class="card">
+    <h3>Sobre os dados</h3>
+    <p>Este ambiente está usando <strong>dados fictícios de teste</strong>, como combinado — ainda não há informações reais de clientes conectadas. Quando fizer sentido avançar para dados reais, vale envolver o time de compliance/segurança antes de conectar qualquer informação real de clientes.</p>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabaseClient.js"></script>
+<script src="js/authGuard.js"></script>
+<script>
+  async function carregarAdmin() {
+    const { data: session } = await supabaseClient.auth.getSession();
+    if (session.session) {
+      document.getElementById('user-email').textContent = session.session.user.email;
+      document.getElementById('admin-email').textContent = session.session.user.email;
+      const criadoEm = new Date(session.session.user.created_at);
+      document.getElementById('admin-criado-em').textContent = criadoEm.toLocaleDateString('pt-BR');
+    }
+
+    const { count } = await supabaseClient
+      .from('clientes')
+      .select('*', { count: 'exact', head: true });
+
+    document.getElementById('admin-total-clientes').textContent = count ?? '—';
+  }
+
+  carregarAdmin();
+</script>
+</body>
+</html>
